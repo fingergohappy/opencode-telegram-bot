@@ -49,7 +49,7 @@ import { summaryAggregator } from "../summary/aggregator.js";
 import { formatSummary, formatToolInfo, getAssistantParseMode } from "../summary/formatter.js";
 import { ToolMessageBatcher } from "../summary/tool-message-batcher.js";
 import { getCurrentSession } from "../session/manager.js";
-import { ingestSessionInfoForCache, getCachedSessionProjects } from "../session/cache-manager.js";
+import { ingestSessionInfoForCache } from "../session/cache-manager.js";
 import { handleNotifyCallback, sendSessionNotification } from "./handlers/notify.js";
 import { logger } from "../utils/logger.js";
 import { safeBackgroundTask } from "../utils/safe-background-task.js";
@@ -67,6 +67,36 @@ import type { FilePartInput } from "@opencode-ai/sdk/v2";
 let botInstance: Bot<Context> | null = null;
 let chatIdInstance: number | null = null;
 let commandsInitialized = false;
+
+function extractEventSessionId(event: { properties?: unknown }): string | null {
+  const properties = event.properties;
+  if (!properties || typeof properties !== "object") {
+    return null;
+  }
+
+  const record = properties as Record<string, unknown>;
+  if (typeof record.sessionID === "string") {
+    return record.sessionID;
+  }
+
+  const info = record.info;
+  if (info && typeof info === "object") {
+    const infoSessionId = (info as Record<string, unknown>).sessionID;
+    if (typeof infoSessionId === "string") {
+      return infoSessionId;
+    }
+  }
+
+  const part = record.part;
+  if (part && typeof part === "object") {
+    const partSessionId = (part as Record<string, unknown>).sessionID;
+    if (typeof partSessionId === "string") {
+      return partSessionId;
+    }
+  }
+
+  return null;
+}
 
 const TELEGRAM_DOCUMENT_CAPTION_MAX_LENGTH = 1024;
 const SESSION_RETRY_PREFIX = "🔁";
@@ -163,11 +193,6 @@ async function ensureCommandsInitialized(ctx: Context, next: NextFunction): Prom
 }
 
 async function ensureEventSubscription(directory: string): Promise<void> {
-  if (!directory) {
-    logger.error("No directory found for event subscription");
-    return;
-  }
-
   toolMessageBatcher.setIntervalSeconds(config.bot.serviceMessagesIntervalSec);
   summaryAggregator.setOnCleared(() => {
     toolMessageBatcher.clearAll("summary_aggregator_clear");
@@ -454,29 +479,21 @@ async function ensureEventSubscription(directory: string): Promise<void> {
     }
   });
 
-  // Collect all directories to subscribe: current + all cached
-  const directories = new Set<string>();
-  if (directory) {
-    directories.add(directory);
-  }
-  
-  try {
-    const cachedProjects = await getCachedSessionProjects();
-    for (const project of cachedProjects) {
-      directories.add(project.worktree);
-    }
-  } catch (err) {
-    logger.warn("[Bot] Failed to get cached session projects:", err);
-  }
-
-  const directoryList = Array.from(directories);
-  logger.info(`[Bot] Subscribing to OpenCode events for ${directoryList.length} directories`);
+  logger.info(
+    `[Bot] Ensuring global OpenCode event subscription (requested by directory=${directory})`,
+  );
 
   // Notification deduplication: avoid spamming the same notification
   const recentNotifications = new Map<string, number>();
   const NOTIFICATION_DEDUP_WINDOW_MS = 30000; // 30 seconds
 
-  await subscribeToEventsMulti(directoryList, (event, eventDirectory) => {
+  await subscribeToEventsMulti([], (event, eventDirectory) => {
+    const currentSession = getCurrentSession();
+    const eventSessionId = extractEventSessionId(event);
+    logger.info(
+      `[EventsTrace] type=${event.type}, eventSession=${eventSessionId ?? "n/a"}, currentSession=${currentSession?.id ?? "n/a"}, directory=${eventDirectory}`,
+    );
+
     // Cache session info for session.created/session.updated
     if (event.type === "session.created" || event.type === "session.updated") {
       const info = (
@@ -493,11 +510,13 @@ async function ensureEventSubscription(directory: string): Promise<void> {
 
     // Handle notifications for non-current sessions
     if (event.type === "session.idle" || event.type === "session.error") {
-      const props = event.properties as { sessionID?: string; error?: { message?: string; data?: { message?: string } } };
+      const props = event.properties as {
+        sessionID?: string;
+        error?: { message?: string; data?: { message?: string } };
+      };
       const sessionId = props.sessionID;
-      
+
       if (sessionId) {
-        const currentSession = getCurrentSession();
         const isCurrentSession = currentSession?.id === sessionId;
 
         // Only send notification if this is NOT the current session
@@ -506,10 +525,10 @@ async function ensureEventSubscription(directory: string): Promise<void> {
           const now = Date.now();
           const key = `${event.type}:${sessionId}`;
           const lastNotified = recentNotifications.get(key);
-          
+
           if (!lastNotified || now - lastNotified > NOTIFICATION_DEDUP_WINDOW_MS) {
             recentNotifications.set(key, now);
-            
+
             // Clean up old entries
             for (const [k, v] of recentNotifications.entries()) {
               if (now - v > NOTIFICATION_DEDUP_WINDOW_MS * 2) {
@@ -517,20 +536,22 @@ async function ensureEventSubscription(directory: string): Promise<void> {
               }
             }
 
-            const errorMessage = event.type === "session.error" 
-              ? (props.error?.data?.message || props.error?.message || t("common.unknown_error"))
-              : undefined;
+            const errorMessage =
+              event.type === "session.error"
+                ? props.error?.data?.message || props.error?.message || t("common.unknown_error")
+                : undefined;
 
             safeBackgroundTask({
               taskName: `notify.${event.type}`,
-              task: () => sendSessionNotification(
-                botInstance!.api,
-                chatIdInstance!,
-                sessionId,
-                eventDirectory,
-                event.type === "session.idle" ? "idle" : "error",
-                errorMessage,
-              ),
+              task: () =>
+                sendSessionNotification(
+                  botInstance!.api,
+                  chatIdInstance!,
+                  sessionId,
+                  eventDirectory,
+                  event.type === "session.idle" ? "idle" : "error",
+                  errorMessage,
+                ),
             });
           }
         }
@@ -572,6 +593,13 @@ export function createBot(): Bot<Context> {
   }
 
   const bot = new Bot(config.telegram.token, botOptions);
+  botInstance = bot;
+  chatIdInstance = config.telegram.allowedUserId;
+
+  safeBackgroundTask({
+    taskName: "events.global.subscribe",
+    task: () => ensureEventSubscription("startup"),
+  });
 
   // Heartbeat for diagnostics: verify the event loop is not blocked
   let heartbeatCounter = 0;

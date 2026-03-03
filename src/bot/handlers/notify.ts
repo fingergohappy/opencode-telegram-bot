@@ -25,21 +25,23 @@ function buildNotifyHistoryCallback(projectId: string, sessionId: string): strin
   return `${NOTIFY_HISTORY_PREFIX}${projectId}:${sessionId}`;
 }
 
-function parseNotifyCallback(data: string): { type: "switch" | "history"; projectId: string; sessionId: string } | null {
+function parseNotifyCallback(
+  data: string,
+): { type: "switch" | "history"; projectId: string; sessionId: string } | null {
   if (data.startsWith(NOTIFY_SWITCH_PREFIX)) {
     const parts = data.slice(NOTIFY_SWITCH_PREFIX.length).split(":");
     if (parts.length >= 2) {
       return { type: "switch", projectId: parts[0], sessionId: parts.slice(1).join(":") };
     }
   }
-  
+
   if (data.startsWith(NOTIFY_HISTORY_PREFIX)) {
     const parts = data.slice(NOTIFY_HISTORY_PREFIX.length).split(":");
     if (parts.length >= 2) {
       return { type: "history", projectId: parts[0], sessionId: parts.slice(1).join(":") };
     }
   }
-  
+
   return null;
 }
 
@@ -55,39 +57,49 @@ export async function sendSessionNotification(
   errorMessage?: string,
 ): Promise<void> {
   try {
-    // Fetch session details
-    const { data: session, error } = await opencodeClient.session.get({
-      sessionID: sessionId,
-      directory,
-    });
+    const baseParams: { sessionID: string; directory?: string } = { sessionID: sessionId };
+    if (directory) {
+      baseParams.directory = directory;
+    }
+
+    const { data: session, error } = await opencodeClient.session.get(baseParams);
 
     if (error || !session) {
       logger.warn(`[Notify] Failed to fetch session ${sessionId} for notification:`, error);
       return;
     }
 
+    const resolvedDirectory = session.directory || directory;
+    if (!resolvedDirectory) {
+      logger.warn(
+        `[Notify] Session ${sessionId} has no directory in event payload or session data`,
+      );
+      return;
+    }
+
     const currentSession = getCurrentSession();
-    
+
     // Don't send notification with buttons if this is the current session
     const isCurrentSession = currentSession?.id === sessionId;
-    
+
     // Get project name
     const projects = await getCachedSessionProjects();
-    const project = projects.find(p => p.worktree === directory);
-    const projectName = project?.name || directory.split("/").filter(Boolean).pop() || directory;
+    const project = projects.find((p) => p.worktree === resolvedDirectory);
+    const projectName =
+      project?.name || resolvedDirectory.split("/").filter(Boolean).pop() || resolvedDirectory;
 
     let text: string;
     const keyboard = new InlineKeyboard();
 
     if (eventType === "idle") {
       text = t("notify.session_idle", { title: session.title });
-      if (projectName !== directory) {
+      if (projectName !== resolvedDirectory) {
         text += "\n" + t("notify.session_idle.directory", { project: projectName });
       }
     } else {
       const msg = errorMessage || t("common.unknown_error");
       text = t("notify.session_error", { title: session.title, message: msg });
-      if (projectName !== directory) {
+      if (projectName !== resolvedDirectory) {
         text += "\n" + t("notify.session_error.directory", { project: projectName });
       }
     }
@@ -124,8 +136,8 @@ export async function handleNotifyCallback(ctx: Context): Promise<boolean> {
   try {
     // Find the project/directory from cached projects
     const projects = await getCachedSessionProjects();
-    const project = projects.find(p => p.id === parsed.projectId);
-    
+    const project = projects.find((p) => p.id === parsed.projectId);
+
     if (!project) {
       await ctx.answerCallbackQuery({ text: t("callback.processing_error") });
       return true;
@@ -136,7 +148,7 @@ export async function handleNotifyCallback(ctx: Context): Promise<boolean> {
     if (parsed.type === "history") {
       // Just show history preview
       await ctx.answerCallbackQuery();
-      
+
       const { data: session, error } = await opencodeClient.session.get({
         sessionID: parsed.sessionId,
         directory,
@@ -151,7 +163,7 @@ export async function handleNotifyCallback(ctx: Context): Promise<boolean> {
       const previewItems = await loadSessionPreview(parsed.sessionId, directory);
       const previewText = formatSessionPreview(session.title, previewItems);
       await ctx.reply(previewText);
-      
+
       return true;
     }
 
@@ -202,9 +214,13 @@ export async function handleNotifyCallback(ctx: Context): Promise<boolean> {
         }
 
         const keyboard = keyboardManager.getKeyboard();
-        await ctx.reply(t("sessions.selected", { title: session.title }), {
-          reply_markup: keyboard,
-        });
+        await ctx.reply(
+          t("sessions.selected_with_id_html", { title: session.title, id: session.id }),
+          {
+            reply_markup: keyboard,
+            parse_mode: "HTML",
+          },
+        );
       }
 
       return true;

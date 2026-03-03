@@ -42,6 +42,7 @@ export const zh: I18nDictionary = {
 
   "start.welcome":
     "👋 欢迎使用 OpenCode Telegram Bot！\n\n可用命令：\n/projects — 选择项目\n/sessions — 会话列表\n/new — 新建会话\n/status — 状态\n/help — 帮助\n\n请使用底部按钮选择模式、模型和变体。",
+  "bot.started": "✅ Bot 已上线并准备就绪。",
   "help.keyboard_hint": "💡 代理模式、模型、变体和上下文操作请使用底部键盘按钮。",
   "help.text":
     "📖 **帮助**\n\n/status - 查看服务器状态\n/sessions - 会话列表\n/new - 创建新会话\n/help - 帮助",
@@ -116,6 +117,7 @@ export const zh: I18nDictionary = {
   "sessions.select_project": "请选择项目：",
   "sessions.loading_context": "⏳ 正在加载上下文和最新消息...",
   "sessions.selected": "✅ 已选择会话：{title}",
+  "sessions.selected_with_id_html": "✅ 已选择会话：{title}\n\nSession ID：\n<code>{id}</code>",
   "sessions.select_error": "🔴 选择会话失败。",
   "sessions.preview.empty": "没有最近消息。",
   "sessions.preview.title": "最近消息：",

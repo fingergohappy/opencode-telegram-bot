@@ -188,14 +188,21 @@ function formatSessionsSelectProjectText(): string {
 }
 
 function formatProjectLabel(index: number, project: ProjectListItem, isActive: boolean): string {
-  const folderName = project.worktree.replace(/[\\/]+$/g, "").split(/[\\/]/).filter(Boolean).at(-1) || project.worktree;
+  const folderName =
+    project.worktree
+      .replace(/[\\/]+$/g, "")
+      .split(/[\\/]/)
+      .filter(Boolean)
+      .at(-1) || project.worktree;
   const prefix = isActive ? "✅ " : "";
   const label = `${index + 1}. ${folderName}`;
   const full = `${prefix}${label}`;
   return full.length > 64 ? `${full.slice(0, 61)}...` : full;
 }
 
-async function loadProjectsPage(page: number): Promise<{ projects: ProjectListItem[]; hasNext: boolean; page: number }> {
+async function loadProjectsPage(
+  page: number,
+): Promise<{ projects: ProjectListItem[]; hasNext: boolean; page: number }> {
   await syncSessionDirectoryCache();
   const projects = (await getProjects()) as ProjectListItem[];
   const pageSize = config.bot.projectsListLimit;
@@ -204,8 +211,14 @@ async function loadProjectsPage(page: number): Promise<{ projects: ProjectListIt
 
   // Stable sort: current project first, then by worktree.
   const sorted = [...projects].sort((a, b) => {
-    const aActive = currentProject && (a.id === currentProject.id || a.worktree === currentProject.worktree) ? 0 : 1;
-    const bActive = currentProject && (b.id === currentProject.id || b.worktree === currentProject.worktree) ? 0 : 1;
+    const aActive =
+      currentProject && (a.id === currentProject.id || a.worktree === currentProject.worktree)
+        ? 0
+        : 1;
+    const bActive =
+      currentProject && (b.id === currentProject.id || b.worktree === currentProject.worktree)
+        ? 0
+        : 1;
     if (aActive !== bActive) return aActive - bActive;
     return a.worktree.localeCompare(b.worktree);
   });
@@ -221,26 +234,35 @@ async function loadProjectsPage(page: number): Promise<{ projects: ProjectListIt
   };
 }
 
-function buildProjectsKeyboardForSessions(
-  pageData: { projects: ProjectListItem[]; hasNext: boolean; page: number },
-): InlineKeyboard {
+function buildProjectsKeyboardForSessions(pageData: {
+  projects: ProjectListItem[];
+  hasNext: boolean;
+  page: number;
+}): InlineKeyboard {
   const keyboard = new InlineKeyboard();
   const currentProject = getCurrentProject();
   const pageStartIndex = pageData.page * config.bot.projectsListLimit;
 
   pageData.projects.forEach((project, index) => {
     const isActive =
-      !!currentProject && (project.id === currentProject.id || project.worktree === currentProject.worktree);
+      !!currentProject &&
+      (project.id === currentProject.id || project.worktree === currentProject.worktree);
     const label = formatProjectLabel(pageStartIndex + index, project, isActive);
     keyboard.text(label, buildSessionsProjectCallback(project.id)).row();
   });
 
   if (pageData.page > 0) {
-    keyboard.text(t("sessions.button.prev_page"), buildSessionsProjectPageCallback(pageData.page - 1));
+    keyboard.text(
+      t("sessions.button.prev_page"),
+      buildSessionsProjectPageCallback(pageData.page - 1),
+    );
   }
 
   if (pageData.hasNext) {
-    keyboard.text(t("sessions.button.next_page"), buildSessionsProjectPageCallback(pageData.page + 1));
+    keyboard.text(
+      t("sessions.button.next_page"),
+      buildSessionsProjectPageCallback(pageData.page + 1),
+    );
   }
 
   return keyboard;
@@ -328,7 +350,7 @@ export async function handleSessionSelect(ctx: Context): Promise<boolean> {
 
         // Switch project context (same behavior as /projects)
         setCurrentProject(selectedProject);
-        
+
         // Clear session state when switching projects to avoid mismatch errors
         clearSession();
         summaryAggregator.clear();
@@ -490,9 +512,14 @@ export async function handleSessionSelect(ctx: Context): Promise<boolean> {
       // Send session selection confirmation with updated keyboard
       const keyboard = keyboardManager.getKeyboard();
       try {
-        await ctx.api.sendMessage(chatId, t("sessions.selected", { title: session.title }), {
-          reply_markup: keyboard,
-        });
+        await ctx.api.sendMessage(
+          chatId,
+          t("sessions.selected_with_id_html", { title: session.title, id: session.id }),
+          {
+            reply_markup: keyboard,
+            parse_mode: "HTML",
+          },
+        );
       } catch (err) {
         logger.error("[Sessions] Failed to send selection message:", err);
       }

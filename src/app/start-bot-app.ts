@@ -7,6 +7,7 @@ import { processManager } from "../process/manager.js";
 import { warmupSessionDirectoryCache } from "../session/cache-manager.js";
 import { getRuntimeMode } from "../runtime/mode.js";
 import { logger } from "../utils/logger.js";
+import { t } from "../i18n/index.js";
 
 async function getBotVersion(): Promise<string> {
   try {
@@ -45,6 +46,10 @@ export async function startBotApp(): Promise<void> {
   await bot.start({
     onStart: (botInfo) => {
       logger.info(`Bot @${botInfo.username} started!`);
+
+      void bot.api.sendMessage(config.telegram.allowedUserId, t("bot.started")).catch((error) => {
+        logger.warn("[Bot] Failed to send startup notification message", error);
+      });
     },
   });
 }

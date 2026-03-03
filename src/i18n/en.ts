@@ -46,6 +46,7 @@ export const en = {
 
   "start.welcome":
     "👋 Welcome to OpenCode Telegram Bot!\n\nUse commands:\n/projects — select project\n/sessions — session list\n/new — new session\n/status — status\n/help — help\n\nUse the bottom buttons to select agent mode, model, and variant.",
+  "bot.started": "✅ Bot is online and ready.",
   "help.keyboard_hint":
     "💡 Use the bottom keyboard buttons for agent mode, model, variant, and context actions.",
   "help.text":
@@ -129,6 +130,8 @@ export const en = {
   "sessions.select_project": "Select a project:",
   "sessions.loading_context": "⏳ Loading context and latest messages...",
   "sessions.selected": "✅ Session selected: {title}",
+  "sessions.selected_with_id_html":
+    "✅ Session selected: {title}\n\nSession ID:\n<code>{id}</code>",
   "sessions.select_error": "🔴 Failed to select session.",
   "sessions.preview.empty": "No recent messages.",
   "sessions.preview.title": "Recent messages:",

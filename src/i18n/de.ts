@@ -49,6 +49,7 @@ export const de: I18nDictionary = {
 
   "start.welcome":
     "👋 Willkommen beim OpenCode Telegram Bot!\n\nNutze Befehle:\n/projects — Projekt auswählen\n/sessions — Sitzungsliste\n/new — neue Sitzung\n/status — Status\n/help — Hilfe\n\nNutze die unteren Buttons, um Modus, Modell und Variante zu wählen.",
+  "bot.started": "✅ Bot ist online und bereit.",
   "help.keyboard_hint":
     "💡 Nutze die unteren Buttons für Modus, Modell, Variante und Kontextaktionen.",
   "help.text":
@@ -136,6 +137,8 @@ export const de: I18nDictionary = {
   "sessions.select_project": "Projekt auswählen:",
   "sessions.loading_context": "⏳ Lade Kontext und letzte Nachrichten...",
   "sessions.selected": "✅ Sitzung ausgewählt: {title}",
+  "sessions.selected_with_id_html":
+    "✅ Sitzung ausgewählt: {title}\n\nSession-ID:\n<code>{id}</code>",
   "sessions.select_error": "🔴 Sitzung konnte nicht ausgewählt werden.",
   "sessions.preview.empty": "Keine neuen Nachrichten.",
   "sessions.preview.title": "Letzte Nachrichten:",
