@@ -1,6 +1,5 @@
 import { CommandContext, Context } from "grammy";
 import { opencodeClient } from "../../opencode/client.js";
-import { stopEventListening } from "../../opencode/events.js";
 import { getCurrentSession } from "../../session/manager.js";
 import { clearAllInteractionState } from "../../interaction/cleanup.js";
 import { summaryAggregator } from "../../summary/aggregator.js";
@@ -12,7 +11,8 @@ type SessionState = "idle" | "busy" | "not-found";
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 function stopLocalStreaming(): void {
-  stopEventListening();
+  // Don't stop SSE - keep it running for notifications from other sessions
+  // stopEventListening();
   summaryAggregator.clear();
   clearAllInteractionState("stop_command");
 }

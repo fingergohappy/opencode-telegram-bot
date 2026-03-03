@@ -122,6 +122,13 @@ export const zh: I18nDictionary = {
   "sessions.preview.you": "你：",
   "sessions.preview.agent": "代理：",
 
+  "notify.session_idle": "✅ 会话完成：{title}",
+  "notify.session_idle.directory": "📁 项目：{project}",
+  "notify.session_error": "🔴 会话错误：{title}\n\n{message}",
+  "notify.session_error.directory": "📁 项目：{project}",
+  "notify.button.switch": "✅ 切换",
+  "notify.button.history": "📜 历史",
+
   "new.project_not_selected": "🏗 未选择项目。\n\n请先使用 /projects 选择一个项目。",
   "new.created": "✅ 新会话已创建：{title}",
   "new.create_error": "🔴 OpenCode 服务器不可用，或创建会话时发生错误。",

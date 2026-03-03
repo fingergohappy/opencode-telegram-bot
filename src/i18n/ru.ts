@@ -136,6 +136,13 @@ export const ru: I18nDictionary = {
   "sessions.preview.you": "Вы:",
   "sessions.preview.agent": "Агент:",
 
+  "notify.session_idle": "✅ Сессия завершена: {title}",
+  "notify.session_idle.directory": "📁 Проект: {project}",
+  "notify.session_error": "🔴 Ошибка сессии: {title}\n\n{message}",
+  "notify.session_error.directory": "📁 Проект: {project}",
+  "notify.button.switch": "✅ Переключить",
+  "notify.button.history": "📜 История",
+
   "new.project_not_selected": "🏗 Проект не выбран.\n\nСначала выберите проект командой /projects.",
   "new.created": "✅ Создана новая сессия: {title}",
   "new.create_error": "🔴 OpenCode Server недоступен или произошла ошибка при создании сессии.",

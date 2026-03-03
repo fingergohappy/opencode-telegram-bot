@@ -1,7 +1,7 @@
 import { CommandContext, Context } from "grammy";
 import { InlineKeyboard } from "grammy";
 import { opencodeClient } from "../../opencode/client.js";
-import { setCurrentSession, SessionInfo } from "../../session/manager.js";
+import { setCurrentSession, clearSession, SessionInfo } from "../../session/manager.js";
 import { getCurrentProject, setCurrentProject } from "../../settings/manager.js";
 import { getProjects } from "../../project/manager.js";
 import { syncSessionDirectoryCache } from "../../session/cache-manager.js";
@@ -328,8 +328,10 @@ export async function handleSessionSelect(ctx: Context): Promise<boolean> {
 
         // Switch project context (same behavior as /projects)
         setCurrentProject(selectedProject);
-        // When switching project, session is no longer valid.
-        // (Cleanup of pinned/context is handled by project switching command; here we keep it light.)
+        
+        // Clear session state when switching projects to avoid mismatch errors
+        clearSession();
+        summaryAggregator.clear();
 
         const pageSize = config.bot.sessionsListLimit;
         const firstPage = await loadSessionPage(selectedProject.worktree, 0, pageSize);

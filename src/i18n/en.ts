@@ -135,6 +135,13 @@ export const en = {
   "sessions.preview.you": "You:",
   "sessions.preview.agent": "Agent:",
 
+  "notify.session_idle": "✅ Session finished: {title}",
+  "notify.session_idle.directory": "📁 Project: {project}",
+  "notify.session_error": "🔴 Session error: {title}\n\n{message}",
+  "notify.session_error.directory": "📁 Project: {project}",
+  "notify.button.switch": "✅ Switch",
+  "notify.button.history": "📜 History",
+
   "new.project_not_selected":
     "🏗 Project is not selected.\n\nFirst select a project with /projects.",
   "new.created": "✅ New session created: {title}",

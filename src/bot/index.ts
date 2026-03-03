@@ -44,12 +44,13 @@ import { questionManager } from "../question/manager.js";
 import { interactionManager } from "../interaction/manager.js";
 import { clearAllInteractionState } from "../interaction/cleanup.js";
 import { keyboardManager } from "../keyboard/manager.js";
-import { subscribeToEvents } from "../opencode/events.js";
+import { subscribeToEventsMulti } from "../opencode/events.js";
 import { summaryAggregator } from "../summary/aggregator.js";
 import { formatSummary, formatToolInfo, getAssistantParseMode } from "../summary/formatter.js";
 import { ToolMessageBatcher } from "../summary/tool-message-batcher.js";
 import { getCurrentSession } from "../session/manager.js";
-import { ingestSessionInfoForCache } from "../session/cache-manager.js";
+import { ingestSessionInfoForCache, getCachedSessionProjects } from "../session/cache-manager.js";
+import { handleNotifyCallback, sendSessionNotification } from "./handlers/notify.js";
 import { logger } from "../utils/logger.js";
 import { safeBackgroundTask } from "../utils/safe-background-task.js";
 import { pinnedMessageManager } from "../pinned/manager.js";
@@ -453,8 +454,30 @@ async function ensureEventSubscription(directory: string): Promise<void> {
     }
   });
 
-  logger.info(`[Bot] Subscribing to OpenCode events for project: ${directory}`);
-  subscribeToEvents(directory, (event) => {
+  // Collect all directories to subscribe: current + all cached
+  const directories = new Set<string>();
+  if (directory) {
+    directories.add(directory);
+  }
+  
+  try {
+    const cachedProjects = await getCachedSessionProjects();
+    for (const project of cachedProjects) {
+      directories.add(project.worktree);
+    }
+  } catch (err) {
+    logger.warn("[Bot] Failed to get cached session projects:", err);
+  }
+
+  const directoryList = Array.from(directories);
+  logger.info(`[Bot] Subscribing to OpenCode events for ${directoryList.length} directories`);
+
+  // Notification deduplication: avoid spamming the same notification
+  const recentNotifications = new Map<string, number>();
+  const NOTIFICATION_DEDUP_WINDOW_MS = 30000; // 30 seconds
+
+  await subscribeToEventsMulti(directoryList, (event, eventDirectory) => {
+    // Cache session info for session.created/session.updated
     if (event.type === "session.created" || event.type === "session.updated") {
       const info = (
         event.properties as { info?: { directory?: string; time?: { updated?: number } } }
@@ -468,6 +491,53 @@ async function ensureEventSubscription(directory: string): Promise<void> {
       }
     }
 
+    // Handle notifications for non-current sessions
+    if (event.type === "session.idle" || event.type === "session.error") {
+      const props = event.properties as { sessionID?: string; error?: { message?: string; data?: { message?: string } } };
+      const sessionId = props.sessionID;
+      
+      if (sessionId) {
+        const currentSession = getCurrentSession();
+        const isCurrentSession = currentSession?.id === sessionId;
+
+        // Only send notification if this is NOT the current session
+        if (!isCurrentSession && botInstance && chatIdInstance) {
+          // Deduplication check
+          const now = Date.now();
+          const key = `${event.type}:${sessionId}`;
+          const lastNotified = recentNotifications.get(key);
+          
+          if (!lastNotified || now - lastNotified > NOTIFICATION_DEDUP_WINDOW_MS) {
+            recentNotifications.set(key, now);
+            
+            // Clean up old entries
+            for (const [k, v] of recentNotifications.entries()) {
+              if (now - v > NOTIFICATION_DEDUP_WINDOW_MS * 2) {
+                recentNotifications.delete(k);
+              }
+            }
+
+            const errorMessage = event.type === "session.error" 
+              ? (props.error?.data?.message || props.error?.message || t("common.unknown_error"))
+              : undefined;
+
+            safeBackgroundTask({
+              taskName: `notify.${event.type}`,
+              task: () => sendSessionNotification(
+                botInstance!.api,
+                chatIdInstance!,
+                sessionId,
+                eventDirectory,
+                event.type === "session.idle" ? "idle" : "error",
+                errorMessage,
+              ),
+            });
+          }
+        }
+      }
+    }
+
+    // Process event through aggregator (which filters by current session)
     summaryAggregator.processEvent(event);
   }).catch((err) => {
     logger.error("Failed to subscribe to events:", err);
@@ -579,6 +649,7 @@ export function createBot(): Bot<Context> {
 
     try {
       const handledInlineCancel = await handleInlineMenuCancel(ctx);
+      const handledNotify = await handleNotifyCallback(ctx);
       const handledSession = await handleSessionSelect(ctx);
       const handledProject = await handleProjectSelect(ctx);
       const handledQuestion = await handleQuestionCallback(ctx);
@@ -591,11 +662,12 @@ export function createBot(): Bot<Context> {
       const handledCommands = await handleCommandsCallback(ctx, { bot, ensureEventSubscription });
 
       logger.debug(
-        `[Bot] Callback handled: inlineCancel=${handledInlineCancel}, session=${handledSession}, project=${handledProject}, question=${handledQuestion}, permission=${handledPermission}, agent=${handledAgent}, model=${handledModel}, variant=${handledVariant}, compactConfirm=${handledCompactConfirm}, rename=${handledRenameCancel}, commands=${handledCommands}`,
+        `[Bot] Callback handled: inlineCancel=${handledInlineCancel}, notify=${handledNotify}, session=${handledSession}, project=${handledProject}, question=${handledQuestion}, permission=${handledPermission}, agent=${handledAgent}, model=${handledModel}, variant=${handledVariant}, compactConfirm=${handledCompactConfirm}, rename=${handledRenameCancel}, commands=${handledCommands}`,
       );
 
       if (
         !handledInlineCancel &&
+        !handledNotify &&
         !handledSession &&
         !handledProject &&
         !handledQuestion &&

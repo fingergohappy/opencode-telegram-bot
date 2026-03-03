@@ -142,6 +142,13 @@ export const de: I18nDictionary = {
   "sessions.preview.you": "Du:",
   "sessions.preview.agent": "Agent:",
 
+  "notify.session_idle": "✅ Sitzung abgeschlossen: {title}",
+  "notify.session_idle.directory": "📁 Projekt: {project}",
+  "notify.session_error": "🔴 Sitzungsfehler: {title}\n\n{message}",
+  "notify.session_error.directory": "📁 Projekt: {project}",
+  "notify.button.switch": "✅ Wechseln",
+  "notify.button.history": "📜 Verlauf",
+
   "new.project_not_selected":
     "🏗 Projekt ist nicht ausgewählt.\n\nWähle zuerst ein Projekt mit /projects.",
   "new.created": "✅ Neue Sitzung erstellt: {title}",
