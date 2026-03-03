@@ -112,6 +112,8 @@ export const zh: I18nDictionary = {
   "sessions.page_load_error_callback": "无法加载此页面。请重试。",
   "sessions.button.prev_page": "⬅️ 上一页",
   "sessions.button.next_page": "下一页 ➡️",
+  "sessions.button.back_to_projects": "⬅️ 项目列表",
+  "sessions.select_project": "请选择项目：",
   "sessions.loading_context": "⏳ 正在加载上下文和最新消息...",
   "sessions.selected": "✅ 已选择会话：{title}",
   "sessions.select_error": "🔴 选择会话失败。",

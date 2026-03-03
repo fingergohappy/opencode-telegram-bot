@@ -131,6 +131,8 @@ export const es: I18nDictionary = {
   "sessions.page_load_error_callback": "No se puede cargar esta página. Inténtalo de nuevo.",
   "sessions.button.prev_page": "⬅️ Anterior",
   "sessions.button.next_page": "Siguiente ➡️",
+  "sessions.button.back_to_projects": "⬅️ Proyectos",
+  "sessions.select_project": "Selecciona un proyecto:",
   "sessions.loading_context": "⏳ Cargando contexto y los últimos mensajes...",
   "sessions.selected": "✅ Sesión seleccionada: {title}",
   "sessions.select_error": "🔴 No se pudo seleccionar la sesión.",

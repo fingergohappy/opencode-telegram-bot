@@ -132,6 +132,8 @@ export const de: I18nDictionary = {
     "Diese Seite kann nicht geladen werden. Bitte versuche es erneut.",
   "sessions.button.prev_page": "⬅️ Zurück",
   "sessions.button.next_page": "Weiter ➡️",
+  "sessions.button.back_to_projects": "⬅️ Projekte",
+  "sessions.select_project": "Projekt auswählen:",
   "sessions.loading_context": "⏳ Lade Kontext und letzte Nachrichten...",
   "sessions.selected": "✅ Sitzung ausgewählt: {title}",
   "sessions.select_error": "🔴 Sitzung konnte nicht ausgewählt werden.",

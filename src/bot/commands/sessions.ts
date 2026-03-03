@@ -2,7 +2,9 @@ import { CommandContext, Context } from "grammy";
 import { InlineKeyboard } from "grammy";
 import { opencodeClient } from "../../opencode/client.js";
 import { setCurrentSession, SessionInfo } from "../../session/manager.js";
-import { getCurrentProject } from "../../settings/manager.js";
+import { getCurrentProject, setCurrentProject } from "../../settings/manager.js";
+import { getProjects } from "../../project/manager.js";
+import { syncSessionDirectoryCache } from "../../session/cache-manager.js";
 import { clearAllInteractionState } from "../../interaction/cleanup.js";
 import { summaryAggregator } from "../../summary/aggregator.js";
 import { pinnedMessageManager } from "../../pinned/manager.js";
@@ -132,46 +134,231 @@ function buildSessionsKeyboard(pageData: SessionPage, pageSize: number): InlineK
   return keyboard;
 }
 
+type ProjectListItem = {
+  id: string;
+  worktree: string;
+  name?: string;
+};
+
+const SESSIONS_PROJECT_CALLBACK_PREFIX = "sessions:project:";
+const SESSIONS_PROJECT_PAGE_CALLBACK_PREFIX = "sessions:project:page:";
+const SESSIONS_BACK_TO_PROJECTS_CALLBACK = "sessions:project:back";
+
+function buildSessionsProjectCallback(projectId: string): string {
+  return `${SESSIONS_PROJECT_CALLBACK_PREFIX}${projectId}`;
+}
+
+function parseSessionsProjectCallback(data: string): string | null {
+  if (!data.startsWith(SESSIONS_PROJECT_CALLBACK_PREFIX)) {
+    return null;
+  }
+
+  if (data.startsWith(SESSIONS_PROJECT_PAGE_CALLBACK_PREFIX)) {
+    return null;
+  }
+
+  if (data === SESSIONS_BACK_TO_PROJECTS_CALLBACK) {
+    return null;
+  }
+
+  const projectId = data.slice(SESSIONS_PROJECT_CALLBACK_PREFIX.length);
+  return projectId.length > 0 ? projectId : null;
+}
+
+function buildSessionsProjectPageCallback(page: number): string {
+  return `${SESSIONS_PROJECT_PAGE_CALLBACK_PREFIX}${page}`;
+}
+
+function parseSessionsProjectPageCallback(data: string): number | null {
+  if (!data.startsWith(SESSIONS_PROJECT_PAGE_CALLBACK_PREFIX)) {
+    return null;
+  }
+
+  const rawPage = data.slice(SESSIONS_PROJECT_PAGE_CALLBACK_PREFIX.length);
+  const page = Number(rawPage);
+  if (!Number.isInteger(page) || page < 0) {
+    return null;
+  }
+
+  return page;
+}
+
+function formatSessionsSelectProjectText(): string {
+  return t("sessions.select_project");
+}
+
+function formatProjectLabel(index: number, project: ProjectListItem, isActive: boolean): string {
+  const folderName = project.worktree.replace(/[\\/]+$/g, "").split(/[\\/]/).filter(Boolean).at(-1) || project.worktree;
+  const prefix = isActive ? "✅ " : "";
+  const label = `${index + 1}. ${folderName}`;
+  const full = `${prefix}${label}`;
+  return full.length > 64 ? `${full.slice(0, 61)}...` : full;
+}
+
+async function loadProjectsPage(page: number): Promise<{ projects: ProjectListItem[]; hasNext: boolean; page: number }> {
+  await syncSessionDirectoryCache();
+  const projects = (await getProjects()) as ProjectListItem[];
+  const pageSize = config.bot.projectsListLimit;
+
+  const currentProject = getCurrentProject();
+
+  // Stable sort: current project first, then by worktree.
+  const sorted = [...projects].sort((a, b) => {
+    const aActive = currentProject && (a.id === currentProject.id || a.worktree === currentProject.worktree) ? 0 : 1;
+    const bActive = currentProject && (b.id === currentProject.id || b.worktree === currentProject.worktree) ? 0 : 1;
+    if (aActive !== bActive) return aActive - bActive;
+    return a.worktree.localeCompare(b.worktree);
+  });
+
+  const startIndex = page * pageSize;
+  const endExclusive = startIndex + pageSize;
+  const hasNext = sorted.length > endExclusive;
+
+  return {
+    projects: sorted.slice(startIndex, endExclusive),
+    hasNext,
+    page,
+  };
+}
+
+function buildProjectsKeyboardForSessions(
+  pageData: { projects: ProjectListItem[]; hasNext: boolean; page: number },
+): InlineKeyboard {
+  const keyboard = new InlineKeyboard();
+  const currentProject = getCurrentProject();
+  const pageStartIndex = pageData.page * config.bot.projectsListLimit;
+
+  pageData.projects.forEach((project, index) => {
+    const isActive =
+      !!currentProject && (project.id === currentProject.id || project.worktree === currentProject.worktree);
+    const label = formatProjectLabel(pageStartIndex + index, project, isActive);
+    keyboard.text(label, buildSessionsProjectCallback(project.id)).row();
+  });
+
+  if (pageData.page > 0) {
+    keyboard.text(t("sessions.button.prev_page"), buildSessionsProjectPageCallback(pageData.page - 1));
+  }
+
+  if (pageData.hasNext) {
+    keyboard.text(t("sessions.button.next_page"), buildSessionsProjectPageCallback(pageData.page + 1));
+  }
+
+  return keyboard;
+}
+
+async function showProjectsMenuForSessions(ctx: Context, page: number): Promise<void> {
+  const pageData = await loadProjectsPage(page);
+  if (pageData.projects.length === 0) {
+    await ctx.reply(t("projects.empty"));
+    return;
+  }
+
+  const keyboard = buildProjectsKeyboardForSessions(pageData);
+
+  await replyWithInlineMenu(ctx, {
+    menuKind: "session",
+    text: formatSessionsSelectProjectText(),
+    keyboard,
+  });
+}
+
 export async function sessionsCommand(ctx: CommandContext<Context>) {
   try {
-    const pageSize = config.bot.sessionsListLimit;
-    const currentProject = getCurrentProject();
-
-    if (!currentProject) {
-      await ctx.reply(t("sessions.project_not_selected"));
-      return;
-    }
-
-    logger.debug(`[Sessions] Fetching sessions for directory: ${currentProject.worktree}`);
-
-    const firstPage = await loadSessionPage(currentProject.worktree, 0, pageSize);
-
-    logger.debug(`[Sessions] Found ${firstPage.sessions.length} sessions on page 1`);
-    firstPage.sessions.forEach((session) => {
-      logger.debug(`[Sessions] Session: ${session.title} | ${session.directory}`);
-    });
-
-    if (firstPage.sessions.length === 0) {
-      await ctx.reply(t("sessions.empty"));
-      return;
-    }
-
-    const keyboard = buildSessionsKeyboard(firstPage, pageSize);
-
-    await replyWithInlineMenu(ctx, {
-      menuKind: "session",
-      text: formatSessionsSelectText(firstPage.page),
-      keyboard,
-    });
+    // Scheme B: Always show project selection first, with current project highlighted.
+    await showProjectsMenuForSessions(ctx, 0);
   } catch (error) {
-    logger.error("[Sessions] Error fetching sessions:", error);
+    logger.error("[Sessions] Error opening sessions project menu:", error);
     await ctx.reply(t("sessions.fetch_error"));
   }
 }
 
 export async function handleSessionSelect(ctx: Context): Promise<boolean> {
   const callbackQuery = ctx.callbackQuery;
-  if (!callbackQuery?.data || !callbackQuery.data.startsWith(SESSION_CALLBACK_PREFIX)) {
+  if (!callbackQuery?.data) {
+    return false;
+  }
+
+  // Sessions menu is now two-level: Project -> Session
+  const projectPage = parseSessionsProjectPageCallback(callbackQuery.data);
+  const projectId = parseSessionsProjectCallback(callbackQuery.data);
+  const backToProjects = callbackQuery.data === SESSIONS_BACK_TO_PROJECTS_CALLBACK;
+
+  if (projectPage !== null || projectId !== null || backToProjects) {
+    const isActiveMenu = await ensureActiveInlineMenu(ctx, "session");
+    if (!isActiveMenu) {
+      return true;
+    }
+
+    try {
+      if (backToProjects) {
+        const pageData = await loadProjectsPage(0);
+        const keyboard = buildProjectsKeyboardForSessions(pageData);
+        appendInlineMenuCancelButton(keyboard, "session");
+        await ctx.editMessageText(formatSessionsSelectProjectText(), {
+          reply_markup: keyboard,
+        });
+        await ctx.answerCallbackQuery();
+        return true;
+      }
+
+      if (projectPage !== null) {
+        const pageData = await loadProjectsPage(projectPage);
+        if (pageData.projects.length === 0) {
+          await ctx.answerCallbackQuery({ text: t("sessions.page_empty_callback") });
+          return true;
+        }
+
+        const keyboard = buildProjectsKeyboardForSessions(pageData);
+        appendInlineMenuCancelButton(keyboard, "session");
+        await ctx.editMessageText(formatSessionsSelectProjectText(), {
+          reply_markup: keyboard,
+        });
+        await ctx.answerCallbackQuery();
+        return true;
+      }
+
+      if (projectId) {
+        const projects = (await getProjects()) as ProjectListItem[];
+        const selectedProject = projects.find((p) => p.id === projectId);
+
+        if (!selectedProject) {
+          await ctx.answerCallbackQuery({ text: t("callback.processing_error") });
+          return true;
+        }
+
+        // Switch project context (same behavior as /projects)
+        setCurrentProject(selectedProject);
+        // When switching project, session is no longer valid.
+        // (Cleanup of pinned/context is handled by project switching command; here we keep it light.)
+
+        const pageSize = config.bot.sessionsListLimit;
+        const firstPage = await loadSessionPage(selectedProject.worktree, 0, pageSize);
+
+        if (firstPage.sessions.length === 0) {
+          await ctx.answerCallbackQuery();
+          await ctx.reply(t("sessions.empty"));
+          return true;
+        }
+
+        const keyboard = buildSessionsKeyboard(firstPage, pageSize);
+        keyboard.row();
+        keyboard.text(t("sessions.button.back_to_projects"), SESSIONS_BACK_TO_PROJECTS_CALLBACK);
+        appendInlineMenuCancelButton(keyboard, "session");
+
+        await ctx.editMessageText(formatSessionsSelectText(firstPage.page), {
+          reply_markup: keyboard,
+        });
+        await ctx.answerCallbackQuery();
+        return true;
+      }
+    } catch (err) {
+      logger.error("[Sessions] Error handling sessions project menu callback:", err);
+      await ctx.answerCallbackQuery({ text: t("callback.processing_error") }).catch(() => {});
+      return true;
+    }
+  }
+
+  if (!callbackQuery.data.startsWith(SESSION_CALLBACK_PREFIX)) {
     return false;
   }
 
@@ -203,6 +390,8 @@ export async function handleSessionSelect(ctx: Context): Promise<boolean> {
         }
 
         const keyboard = buildSessionsKeyboard(pageData, pageSize);
+        keyboard.row();
+        keyboard.text(t("sessions.button.back_to_projects"), SESSIONS_BACK_TO_PROJECTS_CALLBACK);
         appendInlineMenuCancelButton(keyboard, "session");
         await ctx.editMessageText(formatSessionsSelectText(pageData.page), {
           reply_markup: keyboard,

@@ -125,6 +125,8 @@ export const en = {
   "sessions.page_load_error_callback": "Cannot load this page. Please try again.",
   "sessions.button.prev_page": "⬅️ Prev",
   "sessions.button.next_page": "Next ➡️",
+  "sessions.button.back_to_projects": "⬅️ Projects",
+  "sessions.select_project": "Select a project:",
   "sessions.loading_context": "⏳ Loading context and latest messages...",
   "sessions.selected": "✅ Session selected: {title}",
   "sessions.select_error": "🔴 Failed to select session.",

@@ -126,6 +126,8 @@ export const ru: I18nDictionary = {
     "Не удалось загрузить эту страницу. Пожалуйста, попробуйте снова.",
   "sessions.button.prev_page": "⬅️ Назад",
   "sessions.button.next_page": "Вперёд ➡️",
+  "sessions.button.back_to_projects": "⬅️ Проекты",
+  "sessions.select_project": "Выберите проект:",
   "sessions.loading_context": "⏳ Загружаю контекст и последние сообщения...",
   "sessions.selected": "✅ Сессия выбрана: {title}",
   "sessions.select_error": "🔴 Ошибка при выборе сессии.",
