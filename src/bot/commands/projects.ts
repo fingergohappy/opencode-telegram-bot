@@ -267,19 +267,10 @@ export async function handleProjectSelect(ctx: Context): Promise<boolean> {
       keyboardManager.initialize(ctx.api, ctx.chat.id);
     }
 
-    // Refresh context limit for current model
-    await pinnedMessageManager.refreshContextLimit();
-    const contextLimit = pinnedMessageManager.getContextLimit();
-
-    // Reset context to 0 (no session selected) with current model's limit
-    keyboardManager.updateContext(0, contextLimit);
-
-    // Get current state for keyboard (with context = 0)
     const currentAgent = getStoredAgent();
     const currentModel = getStoredModel();
-    const contextInfo = { tokensUsed: 0, tokensLimit: contextLimit };
     const variantName = formatVariantForButton(currentModel.variant || "default");
-    const keyboard = createMainKeyboard(currentAgent, currentModel, contextInfo, variantName);
+    const keyboard = createMainKeyboard(currentAgent, currentModel, variantName);
 
     const projectName = selectedProject.name || selectedProject.worktree;
 

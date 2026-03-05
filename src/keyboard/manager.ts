@@ -5,7 +5,7 @@ import { getStoredAgent } from "../agent/manager.js";
 import { getStoredModel } from "../model/manager.js";
 import { formatVariantForButton } from "../variant/manager.js";
 import { logger } from "../utils/logger.js";
-import type { ContextInfo, KeyboardState } from "./types.js";
+import type { KeyboardState } from "./types.js";
 import { t } from "../i18n/index.js";
 
 /**
@@ -34,7 +34,6 @@ class KeyboardManager {
       this.state = {
         currentAgent: getStoredAgent(),
         currentModel: currentModel,
-        contextInfo: null,
         variantName: formatVariantForButton(currentModel.variant || "default"),
       };
       logger.debug(
@@ -85,49 +84,17 @@ class KeyboardManager {
   }
 
   /**
-   * Update context information
-   */
-  public updateContext(tokensUsed: number, tokensLimit: number): void {
-    if (!this.state) {
-      logger.warn("[KeyboardManager] Cannot update context: not initialized");
-      return;
-    }
-    this.state.contextInfo = { tokensUsed, tokensLimit };
-    logger.debug(`[KeyboardManager] Context updated: ${tokensUsed}/${tokensLimit}`);
-  }
-
-  /**
-   * Clear context information
-   */
-  public clearContext(): void {
-    if (!this.state) {
-      logger.warn("[KeyboardManager] Cannot clear context: not initialized");
-      return;
-    }
-    this.state.contextInfo = null;
-    logger.debug("[KeyboardManager] Context cleared");
-  }
-
-  /**
-   * Get current context info
-   */
-  public getContextInfo(): ContextInfo | null {
-    return this.state?.contextInfo ?? null;
-  }
-
-  /**
    * Build keyboard with current state
    */
   private buildKeyboard() {
     if (!this.state) {
       logger.warn("[KeyboardManager] Cannot build keyboard: not initialized");
       // Return a minimal keyboard as fallback
-      return createMainKeyboard("build", { providerID: "", modelID: "" }, undefined);
+      return createMainKeyboard("build", { providerID: "", modelID: "" });
     }
     return createMainKeyboard(
       this.state.currentAgent,
       this.state.currentModel,
-      this.state.contextInfo ?? undefined,
       this.state.variantName,
     );
   }

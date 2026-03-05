@@ -86,6 +86,12 @@ OpenCode Server
 - Avoid fragile one-liners that can break in PowerShell.
 - Use absolute paths when working with file tools (`read`, `write`, `edit`).
 
+### agent-dev runtime policy
+
+- Use the **agent-dev** feature for both project startup and test execution workflows.
+- Do not rely on hot reload/file watching during development tasks.
+- This project requires a **manual restart** after code changes.
+
 ## Coding rules
 
 ### Language
@@ -211,6 +217,7 @@ Full docs: https://opencode.ai/docs/sdk
 2. Inspect existing code before adding or changing components.
 3. Align major architecture changes (including new dependencies) with the user first.
 4. Add or update tests for new functionality.
-5. After code changes, run quality checks: `npm run build`, `npm run lint`, and `npm test`.
-6. Update checkboxes in `PRODUCT.md` when relevant tasks are completed.
-7. Keep code clean, consistent, and maintainable.
+5. After code changes, run quality checks via the **agent-dev** workflow (`npm run build`, `npm run lint`, and `npm test`).
+6. For startup and validation tasks, use **agent-dev** and restart manually after changes (no hot reload).
+7. Update checkboxes in `PRODUCT.md` when relevant tasks are completed.
+8. Keep code clean, consistent, and maintainable.

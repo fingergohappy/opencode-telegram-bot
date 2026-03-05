@@ -38,7 +38,6 @@ import { handlePermissionCallback, showPermissionRequest } from "./handlers/perm
 import { handleAgentSelect, showAgentSelectionMenu } from "./handlers/agent.js";
 import { handleModelSelect, showModelSelectionMenu } from "./handlers/model.js";
 import { handleVariantSelect, showVariantSelectionMenu } from "./handlers/variant.js";
-import { handleContextButtonPress, handleCompactConfirm } from "./handlers/context.js";
 import { handleInlineMenuCancel } from "./handlers/inline-menu.js";
 import { questionManager } from "../question/manager.js";
 import { interactionManager } from "../interaction/manager.js";
@@ -378,14 +377,6 @@ async function ensureEventSubscription(directory: string): Promise<void> {
     try {
       logger.debug(`[Bot] Received tokens: input=${tokens.input}, output=${tokens.output}`);
 
-      // Update keyboardManager SYNCHRONOUSLY before any await
-      // This ensures keyboard has correct context when onComplete sends the reply
-      const contextSize = tokens.input + tokens.cacheRead;
-      const contextLimit = pinnedMessageManager.getContextLimit();
-      if (contextLimit > 0) {
-        keyboardManager.updateContext(contextSize, contextLimit);
-      }
-
       await pinnedMessageManager.onMessageComplete(tokens);
     } catch (err) {
       logger.error("[Bot] Error updating pinned message with tokens:", err);
@@ -469,16 +460,6 @@ async function ensureEventSubscription(directory: string): Promise<void> {
     pinnedMessageManager.addFileChange(change);
   });
 
-  pinnedMessageManager.setOnKeyboardUpdate(async (tokensUsed, tokensLimit) => {
-    try {
-      logger.debug(`[Bot] Updating keyboard with context: ${tokensUsed}/${tokensLimit}`);
-      keyboardManager.updateContext(tokensUsed, tokensLimit);
-      // Don't send automatic keyboard updates - keyboard will update naturally with user messages
-    } catch (err) {
-      logger.error("[Bot] Error updating keyboard context:", err);
-    }
-  });
-
   logger.info(
     `[Bot] Ensuring global OpenCode event subscription (requested by directory=${directory})`,
   );
@@ -489,10 +470,14 @@ async function ensureEventSubscription(directory: string): Promise<void> {
 
   await subscribeToEventsMulti([], (event, eventDirectory) => {
     const currentSession = getCurrentSession();
+    const eventType = String(event.type);
     const eventSessionId = extractEventSessionId(event);
-    logger.info(
-      `[EventsTrace] type=${event.type}, eventSession=${eventSessionId ?? "n/a"}, currentSession=${currentSession?.id ?? "n/a"}, directory=${eventDirectory}`,
-    );
+
+    if (eventType !== "server.heartbeat") {
+      logger.info(
+        `[EventsTrace] type=${eventType}, eventSession=${eventSessionId ?? "n/a"}, currentSession=${currentSession?.id ?? "n/a"}, directory=${eventDirectory}`,
+      );
+    }
 
     // Cache session info for session.created/session.updated
     if (event.type === "session.created" || event.type === "session.updated") {
@@ -573,11 +558,17 @@ export function createBot(): Bot<Context> {
   const botOptions: ConstructorParameters<typeof Bot<Context>>[1] = {};
 
   if (config.telegram.proxyUrl) {
-    const proxyUrl = config.telegram.proxyUrl;
+    const rawProxyUrl = config.telegram.proxyUrl;
+    const proxyUrl = rawProxyUrl.startsWith("socks5://")
+      ? rawProxyUrl.replace(/^socks5:\/\//, "socks5h://")
+      : rawProxyUrl;
     let agent;
 
     if (proxyUrl.startsWith("socks")) {
       agent = new SocksProxyAgent(proxyUrl);
+      if (proxyUrl !== rawProxyUrl) {
+        logger.info("[Bot] Normalized SOCKS proxy scheme from socks5:// to socks5h://");
+      }
       logger.info(`[Bot] Using SOCKS proxy: ${proxyUrl.replace(/\/\/.*@/, "//***@")}`);
     } else {
       agent = new HttpsProxyAgent(proxyUrl);
@@ -685,12 +676,11 @@ export function createBot(): Bot<Context> {
       const handledAgent = await handleAgentSelect(ctx);
       const handledModel = await handleModelSelect(ctx);
       const handledVariant = await handleVariantSelect(ctx);
-      const handledCompactConfirm = await handleCompactConfirm(ctx);
       const handledRenameCancel = await handleRenameCancel(ctx);
       const handledCommands = await handleCommandsCallback(ctx, { bot, ensureEventSubscription });
 
       logger.debug(
-        `[Bot] Callback handled: inlineCancel=${handledInlineCancel}, notify=${handledNotify}, session=${handledSession}, project=${handledProject}, question=${handledQuestion}, permission=${handledPermission}, agent=${handledAgent}, model=${handledModel}, variant=${handledVariant}, compactConfirm=${handledCompactConfirm}, rename=${handledRenameCancel}, commands=${handledCommands}`,
+        `[Bot] Callback handled: inlineCancel=${handledInlineCancel}, notify=${handledNotify}, session=${handledSession}, project=${handledProject}, question=${handledQuestion}, permission=${handledPermission}, agent=${handledAgent}, model=${handledModel}, variant=${handledVariant}, rename=${handledRenameCancel}, commands=${handledCommands}`,
       );
 
       if (
@@ -703,7 +693,6 @@ export function createBot(): Bot<Context> {
         !handledAgent &&
         !handledModel &&
         !handledVariant &&
-        !handledCompactConfirm &&
         !handledRenameCancel &&
         !handledCommands
       ) {
@@ -750,24 +739,6 @@ export function createBot(): Bot<Context> {
     }
   });
 
-  // Handle Reply Keyboard button press (context button)
-  bot.hears(/^📊(?:\s|$)/, async (ctx) => {
-    logger.debug(`[Bot] Context button pressed: ${ctx.message?.text}`);
-
-    try {
-      if (await blockMenuWhileInteractionActive(ctx)) {
-        return;
-      }
-
-      await handleContextButtonPress(ctx);
-    } catch (err) {
-      logger.error("[Bot] Error handling context button:", err);
-      await ctx.reply(t("error.context_button"));
-    }
-  });
-
-  // Handle Reply Keyboard button press (variant selector)
-  // Keep support for both legacy "💭" and current "💡" prefix.
   bot.hears(VARIANT_BUTTON_TEXT_PATTERN, async (ctx) => {
     logger.debug(`[Bot] Variant button pressed: ${ctx.message?.text}`);
 

@@ -5,9 +5,12 @@ import { getStoredModel } from "../../model/manager.js";
 import { formatVariantForButton } from "../../variant/manager.js";
 import { pinnedMessageManager } from "../../pinned/manager.js";
 import { keyboardManager } from "../../keyboard/manager.js";
+import { syncStoredSelectionFromActiveSession } from "../../runtime/selection-sync.js";
 import { t } from "../../i18n/index.js";
 
 export async function startCommand(ctx: Context): Promise<void> {
+  await syncStoredSelectionFromActiveSession();
+
   if (ctx.chat) {
     if (!pinnedMessageManager.isInitialized()) {
       pinnedMessageManager.initialize(ctx.api, ctx.chat.id);
@@ -15,32 +18,14 @@ export async function startCommand(ctx: Context): Promise<void> {
     keyboardManager.initialize(ctx.api, ctx.chat.id);
   }
 
-  if (pinnedMessageManager.getContextLimit() === 0) {
-    await pinnedMessageManager.refreshContextLimit();
-  }
-
-  // Get current agent, model, and context
   const currentAgent = getStoredAgent();
   const currentModel = getStoredModel();
   const variantName = formatVariantForButton(currentModel.variant || "default");
-  const contextInfo =
-    pinnedMessageManager.getContextInfo() ??
-    (pinnedMessageManager.getContextLimit() > 0
-      ? { tokensUsed: 0, tokensLimit: pinnedMessageManager.getContextLimit() }
-      : null);
 
   keyboardManager.updateAgent(currentAgent);
   keyboardManager.updateModel(currentModel);
-  if (contextInfo) {
-    keyboardManager.updateContext(contextInfo.tokensUsed, contextInfo.tokensLimit);
-  }
 
-  const keyboard = createMainKeyboard(
-    currentAgent,
-    currentModel,
-    contextInfo ?? undefined,
-    variantName,
-  );
+  const keyboard = createMainKeyboard(currentAgent, currentModel, variantName);
 
   await ctx.reply(t("start.welcome"), { reply_markup: keyboard });
 }

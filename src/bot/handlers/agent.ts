@@ -50,28 +50,14 @@ export async function handleAgentSelect(ctx: Context): Promise<boolean> {
     // Update keyboard manager state
     keyboardManager.updateAgent(agentName);
 
-    // Update Reply Keyboard with new agent, current model, and context
     const currentModel = getStoredModel();
-    const contextInfo =
-      pinnedMessageManager.getContextInfo() ??
-      (pinnedMessageManager.getContextLimit() > 0
-        ? { tokensUsed: 0, tokensLimit: pinnedMessageManager.getContextLimit() }
-        : null);
 
     keyboardManager.updateModel(currentModel);
-    if (contextInfo) {
-      keyboardManager.updateContext(contextInfo.tokensUsed, contextInfo.tokensLimit);
-    }
 
     const state = keyboardManager.getState();
     const variantName =
       state?.variantName ?? formatVariantForButton(currentModel.variant || "default");
-    const keyboard = createMainKeyboard(
-      agentName,
-      currentModel,
-      contextInfo ?? undefined,
-      variantName,
-    );
+    const keyboard = createMainKeyboard(agentName, currentModel, variantName);
     const displayName = getAgentDisplayName(agentName);
 
     clearActiveInlineMenu("agent_selected");

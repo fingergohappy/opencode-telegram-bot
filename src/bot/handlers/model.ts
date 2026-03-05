@@ -82,25 +82,10 @@ export async function handleModelSelect(ctx: Context): Promise<boolean> {
     // Refresh context limit for new model
     await pinnedMessageManager.refreshContextLimit();
 
-    // Update Reply Keyboard with new model and context
     const currentAgent = getStoredAgent();
-    const contextInfo =
-      pinnedMessageManager.getContextInfo() ??
-      (pinnedMessageManager.getContextLimit() > 0
-        ? { tokensUsed: 0, tokensLimit: pinnedMessageManager.getContextLimit() }
-        : null);
-
-    if (contextInfo) {
-      keyboardManager.updateContext(contextInfo.tokensUsed, contextInfo.tokensLimit);
-    }
 
     const variantName = formatVariantForButton(modelInfo.variant || "default");
-    const keyboard = createMainKeyboard(
-      currentAgent,
-      modelInfo,
-      contextInfo ?? undefined,
-      variantName,
-    );
+    const keyboard = createMainKeyboard(currentAgent, modelInfo, variantName);
     const displayName = formatModelForDisplay(modelInfo.providerID, modelInfo.modelID);
 
     clearActiveInlineMenu("model_selected");

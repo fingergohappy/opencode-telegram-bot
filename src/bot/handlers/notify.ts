@@ -208,11 +208,6 @@ export async function handleNotifyCallback(ctx: Context): Promise<boolean> {
           logger.error("[Notify] Error initializing pinned message:", err);
         }
 
-        const contextInfo = pinnedMessageManager.getContextInfo();
-        if (contextInfo) {
-          keyboardManager.updateContext(contextInfo.tokensUsed, contextInfo.tokensLimit);
-        }
-
         const keyboard = keyboardManager.getKeyboard();
         await ctx.reply(
           t("sessions.selected_with_id_html", { title: session.title, id: session.id }),

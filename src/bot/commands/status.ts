@@ -12,9 +12,12 @@ import { pinnedMessageManager } from "../../pinned/manager.js";
 import { logger } from "../../utils/logger.js";
 import { t } from "../../i18n/index.js";
 import { sendMessageWithMarkdownFallback } from "../utils/send-with-markdown-fallback.js";
+import { syncStoredSelectionFromActiveSession } from "../../runtime/selection-sync.js";
 
 export async function statusCommand(ctx: CommandContext<Context>) {
   try {
+    await syncStoredSelectionFromActiveSession();
+
     const { data, error } = await opencodeClient.global.health();
 
     if (error || !data) {
@@ -77,11 +80,6 @@ export async function statusCommand(ctx: CommandContext<Context>) {
         await pinnedMessageManager.refreshContextLimit();
       }
       keyboardManager.initialize(ctx.api, ctx.chat.id);
-    }
-    // Sync current context (tokens used + limit) into keyboard state
-    const contextInfo = pinnedMessageManager.getContextInfo();
-    if (contextInfo) {
-      keyboardManager.updateContext(contextInfo.tokensUsed, contextInfo.tokensLimit);
     }
     const keyboard = keyboardManager.getKeyboard();
     if (ctx.chat) {

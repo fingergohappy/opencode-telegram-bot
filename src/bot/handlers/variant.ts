@@ -69,25 +69,10 @@ export async function handleVariantSelect(ctx: Context): Promise<boolean> {
     keyboardManager.updateModel(updatedModel);
     keyboardManager.updateVariant(variantId);
 
-    // Build keyboard with correct context info
     const currentAgent = getStoredAgent();
-    const contextInfo =
-      pinnedMessageManager.getContextInfo() ??
-      (pinnedMessageManager.getContextLimit() > 0
-        ? { tokensUsed: 0, tokensLimit: pinnedMessageManager.getContextLimit() }
-        : null);
-
-    if (contextInfo) {
-      keyboardManager.updateContext(contextInfo.tokensUsed, contextInfo.tokensLimit);
-    }
 
     const variantName = formatVariantForButton(variantId);
-    const keyboard = createMainKeyboard(
-      currentAgent,
-      updatedModel,
-      contextInfo ?? undefined,
-      variantName,
-    );
+    const keyboard = createMainKeyboard(currentAgent, updatedModel, variantName);
 
     // Send confirmation message with updated keyboard
     const displayName = formatVariantForDisplay(variantId);

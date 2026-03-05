@@ -43,7 +43,7 @@ export const zh: I18nDictionary = {
   "start.welcome":
     "👋 欢迎使用 OpenCode Telegram Bot！\n\n可用命令：\n/projects — 选择项目\n/sessions — 会话列表\n/new — 新建会话\n/status — 状态\n/help — 帮助\n\n请使用底部按钮选择模式、模型和变体。",
   "bot.started": "✅ Bot 已上线并准备就绪。",
-  "help.keyboard_hint": "💡 代理模式、模型、变体和上下文操作请使用底部键盘按钮。",
+  "help.keyboard_hint": "💡 代理模式、模型和变体操作请使用底部键盘按钮。",
   "help.text":
     "📖 **帮助**\n\n/status - 查看服务器状态\n/sessions - 会话列表\n/new - 创建新会话\n/help - 帮助",
 
@@ -250,8 +250,6 @@ export const zh: I18nDictionary = {
   "question.summary.answer": "回答：\n{answer}\n\n",
 
   "keyboard.agent_mode": "{emoji} {name} 模式",
-  "keyboard.context": "📊 {used} / {limit} ({percent}%)",
-  "keyboard.context_empty": "📊 0",
   "keyboard.variant": "💭 {name}",
   "keyboard.variant_default": "💡 默认",
   "keyboard.updated": "⌨️ 键盘已更新",

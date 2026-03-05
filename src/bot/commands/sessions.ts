@@ -494,13 +494,6 @@ export async function handleSessionSelect(ctx: Context): Promise<boolean> {
     if (ctx.chat) {
       const chatId = ctx.chat.id;
 
-      // Update keyboard with loaded context (callback executes async via setImmediate, so update manually)
-      const contextInfo = pinnedMessageManager.getContextInfo();
-      if (contextInfo) {
-        keyboardManager.updateContext(contextInfo.tokensUsed, contextInfo.tokensLimit);
-      }
-
-      // Delete loading message
       if (loadingMessageId) {
         try {
           await ctx.api.deleteMessage(chatId, loadingMessageId);

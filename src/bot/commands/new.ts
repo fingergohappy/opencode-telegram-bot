@@ -61,17 +61,10 @@ export async function newCommand(ctx: CommandContext<Context>) {
       logger.error("[Bot] Error creating pinned message:", err);
     }
 
-    // Get current state for keyboard
     const currentAgent = getStoredAgent();
     const currentModel = getStoredModel();
-    const contextInfo = pinnedMessageManager.getContextInfo();
     const variantName = formatVariantForButton(currentModel.variant || "default");
-    const keyboard = createMainKeyboard(
-      currentAgent,
-      currentModel,
-      contextInfo ?? undefined,
-      variantName,
-    );
+    const keyboard = createMainKeyboard(currentAgent, currentModel, variantName);
 
     await ctx.reply(t("new.created", { title: session.title }), {
       reply_markup: keyboard,

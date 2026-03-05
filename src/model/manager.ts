@@ -1,5 +1,6 @@
 import { getCurrentModel, setCurrentModel } from "../settings/manager.js";
 import { config } from "../config.js";
+import { opencodeClient } from "../opencode/client.js";
 import { logger } from "../utils/logger.js";
 import type { ModelInfo, FavoriteModel, ModelSelectionLists } from "./types.js";
 import path from "node:path";
@@ -9,15 +10,42 @@ interface OpenCodeModelState {
   recent?: Array<{ providerID?: string; modelID?: string }>;
 }
 
-function getEnvDefaultModel(): FavoriteModel | null {
-  const providerID = config.opencode.model.provider;
-  const modelID = config.opencode.model.modelId;
+let serverDefaultModel: FavoriteModel | null = null;
 
-  if (!providerID || !modelID) {
-    return null;
+export async function initDefaultModelFromServer(): Promise<void> {
+  try {
+    const { data, error } = await opencodeClient.config.providers();
+    if (error || !data) {
+      logger.warn("[ModelManager] Failed to fetch providers for default model:", error);
+      return;
+    }
+
+    const defaults = (data as { default?: Record<string, string> }).default;
+    if (defaults && typeof defaults === "object") {
+      const entries = Object.entries(defaults);
+      if (entries.length > 0) {
+        const [providerID, modelID] = entries[0];
+        serverDefaultModel = { providerID, modelID };
+        logger.info(`[ModelManager] Server default model: ${providerID}/${modelID}`);
+        return;
+      }
+    }
+
+    logger.warn("[ModelManager] No default model found from server");
+  } catch (err) {
+    logger.error("[ModelManager] Error fetching default model from server:", err);
+  }
+}
+
+function getDefaultModel(): FavoriteModel | null {
+  if (config.opencode.model.provider && config.opencode.model.modelId) {
+    return {
+      providerID: config.opencode.model.provider,
+      modelID: config.opencode.model.modelId,
+    };
   }
 
-  return { providerID, modelID };
+  return serverDefaultModel;
 }
 
 function dedupeModels(models: FavoriteModel[]): FavoriteModel[] {
@@ -87,7 +115,7 @@ function getOpenCodeModelStatePath(): string {
  * Config model is always treated as favorite.
  */
 export async function getModelSelectionLists(): Promise<ModelSelectionLists> {
-  const envDefaultModel = getEnvDefaultModel();
+  const defaultModel = getDefaultModel();
 
   try {
     const fs = await import("fs/promises");
@@ -97,11 +125,9 @@ export async function getModelSelectionLists(): Promise<ModelSelectionLists> {
     const state = JSON.parse(content) as OpenCodeModelState;
 
     const rawFavorites = normalizeFavoriteModels(state);
-    const favorites = envDefaultModel
-      ? dedupeModels([...rawFavorites, envDefaultModel])
-      : rawFavorites;
+    const favorites = defaultModel ? dedupeModels([...rawFavorites, defaultModel]) : rawFavorites;
 
-    if (rawFavorites.length === 0 && envDefaultModel) {
+    if (rawFavorites.length === 0 && defaultModel) {
       logger.info(
         `[ModelManager] No favorites in ${stateFilePath}, using config model as favorite`,
       );
@@ -122,13 +148,13 @@ export async function getModelSelectionLists(): Promise<ModelSelectionLists> {
 
     return { favorites, recent };
   } catch (err) {
-    if (envDefaultModel) {
+    if (defaultModel) {
       logger.warn(
-        "[ModelManager] Failed to load OpenCode model state, using config model as favorite:",
+        "[ModelManager] Failed to load OpenCode model state, using default model as favorite:",
         err,
       );
       return {
-        favorites: [envDefaultModel],
+        favorites: [defaultModel],
         recent: [],
       };
     }
@@ -176,25 +202,27 @@ export function getStoredModel(): ModelInfo {
   const storedModel = getCurrentModel();
 
   if (storedModel) {
-    // Ensure variant is set (default to "default")
     if (!storedModel.variant) {
       storedModel.variant = "default";
     }
     return storedModel;
   }
 
-  // Fallback to model from config (environment variables)
-  if (config.opencode.model.provider && config.opencode.model.modelId) {
-    logger.debug("[ModelManager] Using model from config");
+  const defaultModel = getDefaultModel();
+  if (defaultModel) {
+    logger.debug(
+      `[ModelManager] Using default model: ${defaultModel.providerID}/${defaultModel.modelID}`,
+    );
     return {
-      providerID: config.opencode.model.provider,
-      modelID: config.opencode.model.modelId,
+      providerID: defaultModel.providerID,
+      modelID: defaultModel.modelID,
       variant: "default",
     };
   }
 
-  // This should not happen if config is properly set
-  logger.warn("[ModelManager] No model found in settings or config, returning empty model");
+  logger.warn(
+    "[ModelManager] No model found in settings or server defaults, returning empty model",
+  );
   return {
     providerID: "",
     modelID: "",

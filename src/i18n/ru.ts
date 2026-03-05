@@ -47,8 +47,7 @@ export const ru: I18nDictionary = {
   "start.welcome":
     "👋 Добро пожаловать в OpenCode Telegram Bot!\n\nИспользуйте команды:\n/projects — выбрать проект\n/sessions — список сессий\n/new — новая сессия\n/status — статус\n/help — справка\n\nРежим, модель и вариант выбираются кнопками внизу.",
   "bot.started": "✅ Бот запущен и готов к работе.",
-  "help.keyboard_hint":
-    "💡 Режим, модель, вариант и действия с контекстом доступны через нижние кнопки клавиатуры.",
+  "help.keyboard_hint": "💡 Режим, модель и вариант доступны через нижние кнопки клавиатуры.",
   "help.text":
     "📖 **Справка**\n\n/status - Проверить статус сервера\n/sessions - Список сессий\n/new - Создать новую сессию\n/help - Справка",
 
@@ -277,8 +276,6 @@ export const ru: I18nDictionary = {
   "question.summary.answer": "Ответ:\n{answer}\n\n",
 
   "keyboard.agent_mode": "{emoji} {name} Mode",
-  "keyboard.context": "📊 {used} / {limit} ({percent}%)",
-  "keyboard.context_empty": "📊 0",
   "keyboard.variant": "💭 {name}",
   "keyboard.variant_default": "💡 Default",
   "keyboard.updated": "⌨️ Клавиатура обновлена",

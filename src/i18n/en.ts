@@ -48,7 +48,7 @@ export const en = {
     "👋 Welcome to OpenCode Telegram Bot!\n\nUse commands:\n/projects — select project\n/sessions — session list\n/new — new session\n/status — status\n/help — help\n\nUse the bottom buttons to select agent mode, model, and variant.",
   "bot.started": "✅ Bot is online and ready.",
   "help.keyboard_hint":
-    "💡 Use the bottom keyboard buttons for agent mode, model, variant, and context actions.",
+    "💡 Use the bottom keyboard buttons for agent mode, model, and variant actions.",
   "help.text":
     "📖 **Help**\n\n/status - Check server status\n/sessions - Session list\n/new - Create new session\n/help - Help",
 
@@ -277,8 +277,6 @@ export const en = {
   "question.summary.answer": "Answer:\n{answer}\n\n",
 
   "keyboard.agent_mode": "{emoji} {name} Mode",
-  "keyboard.context": "📊 {used} / {limit} ({percent}%)",
-  "keyboard.context_empty": "📊 0",
   "keyboard.variant": "💭 {name}",
   "keyboard.variant_default": "💡 Default",
   "keyboard.updated": "⌨️ Keyboard updated",

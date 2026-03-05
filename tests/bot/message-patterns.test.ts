@@ -17,7 +17,7 @@ describe("bot/message-patterns", () => {
       modelID: "openai/gpt-4o",
     });
 
-    const modelButtonText = getButtonText(keyboard.keyboard[1][0]);
+    const modelButtonText = getButtonText(keyboard.keyboard[0][1]);
     expect(modelButtonText).toMatch(MODEL_BUTTON_TEXT_PATTERN);
   });
 
@@ -31,7 +31,7 @@ describe("bot/message-patterns", () => {
       modelID: "openai/gpt-4o",
     });
 
-    const variantButtonText = getButtonText(keyboard.keyboard[1][1]);
+    const variantButtonText = getButtonText(keyboard.keyboard[0][2]);
     expect(variantButtonText).toMatch(VARIANT_BUTTON_TEXT_PATTERN);
     expect("💭 Default").toMatch(VARIANT_BUTTON_TEXT_PATTERN);
   });

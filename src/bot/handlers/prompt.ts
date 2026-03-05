@@ -58,7 +58,6 @@ async function resetMismatchedSessionContext(): Promise<void> {
   summaryAggregator.clear();
   clearAllInteractionState("session_mismatch_reset");
   clearSession();
-  keyboardManager.clearContext();
 
   if (!pinnedMessageManager.isInitialized()) {
     return;
@@ -156,14 +155,8 @@ export async function processUserPrompt(
 
     const currentAgent = getStoredAgent();
     const currentModel = getStoredModel();
-    const contextInfo = pinnedMessageManager.getContextInfo();
     const variantName = formatVariantForButton(currentModel.variant || "default");
-    const keyboard = createMainKeyboard(
-      currentAgent,
-      currentModel,
-      contextInfo ?? undefined,
-      variantName,
-    );
+    const keyboard = createMainKeyboard(currentAgent, currentModel, variantName);
 
     await ctx.reply(t("bot.session_created", { title: session.title }), {
       reply_markup: keyboard,
